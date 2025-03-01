@@ -135,8 +135,8 @@ int main(int argc, char *argv[])
                         if (!cd->decode_seq || !cd->data) {
                                 memalloc_failure = true;
                                 goto cleanup_stage1;
-                        }
-                        else {
+
+                        } else {
                                 size_t len = strlen(cd->data);
                                 
                                 printf ("Compressed string: \"%s\"\n", cd->data);
@@ -147,6 +147,7 @@ int main(int argc, char *argv[])
                                         
                                 printf ("%zu}\n", cd->decode_seq[len-1]);
                                 goto cleanup_stage1;
+
                         }
                 }
         } else {

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 #define nullpad(datlen)        (datlen + 1)
 #define NO_ARGS                1
@@ -11,11 +12,6 @@
 #define UNPACK_INDEX_IF_USED   1
 #define MAX_ARGS_NO_UNPACK     2
 #define NO_UNPACK_STR_INDEX    1
-
-typedef enum {
-        false = 0,
-        true = 1
-} bool;
 
 struct compressed_data {
         char *data;

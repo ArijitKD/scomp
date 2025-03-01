@@ -11,7 +11,10 @@
 #define MAX_INDEX_NO_UNPACK    2
 #define NO_UNPACK_STR_INDEX    1
 
-typedef unsigned char bool;
+typedef enum {
+        false = 0,
+        true = 1
+} bool;
 
 struct compressed_data {
         char *data;
@@ -99,18 +102,25 @@ char *decompress(struct compressed_data *cd)
 
 int main(int argc, char *argv[])
 {
-        bool unpack           = 0;
-        bool memalloc_failure = 0;
+        bool unpack           = false;
+        bool memalloc_failure = false;
         
-        if (argc == 1 || !strcmp(argv[1], "-help"))
+        if (argc == 1)
                 goto help;
+
+        if (argc == MAX_INDEX_NO_UNPACK) {
+                if (!strcmp(argv[1], "-help"))
+                        goto help;
+                if (!strcmp(argv[1], "-unpack"))
+                        goto unpackerr;
+        }
 
         if (argc > MAX_INDEX_NO_UNPACK) {
                 
                 if (strcmp(argv[UNPACK_INDEX_IF_USED], "-unpack"))
                         goto argerr;
                 else
-                        unpack = 1;
+                        unpack = true;
         }
         
         struct compressed_data *cd = NULL;
@@ -126,7 +136,7 @@ int main(int argc, char *argv[])
                 } else {
                         
                         if (!cd->decode_seq || !cd->data) {
-                                memalloc_failure = 1;
+                                memalloc_failure = true;
                                 goto cleanup_stage1;
                         }
                         else {
@@ -160,7 +170,7 @@ int main(int argc, char *argv[])
                 cd->decode_seq = malloc(no_of_unique_char * sizeof(size_t));
                 
                 if (!cd->decode_seq) {
-                        memalloc_failure = 1;
+                        memalloc_failure = true;
                         goto cleanup_stage3;
                 }
                 

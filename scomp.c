@@ -3,12 +3,13 @@
 #include <string.h>
 
 #define nullpad(datlen)        (datlen + 1)
+#define NO_ARGS                1
 #define MIN_ARGS_FOR_UNPACK    5
 #define FIRST_DSEQ_ELEM_INDEX  4
 #define UNPACK_STRING_INDEX    2
 #define DSEQ_ARG_INDEX         3
 #define UNPACK_INDEX_IF_USED   1
-#define MAX_INDEX_NO_UNPACK    2
+#define MAX_ARGS_NO_UNPACK     2
 #define NO_UNPACK_STR_INDEX    1
 
 typedef enum {
@@ -105,17 +106,17 @@ int main(int argc, char *argv[])
         bool unpack           = false;
         bool memalloc_failure = false;
         
-        if (argc == 1)
+        if (argc == NO_ARGS)
                 goto help;
 
-        if (argc == MAX_INDEX_NO_UNPACK) {
+        if (argc == MAX_ARGS_NO_UNPACK) {
                 if (!strcmp(argv[1], "-help"))
                         goto help;
                 if (!strcmp(argv[1], "-unpack"))
                         goto unpackerr;
         }
 
-        if (argc > MAX_INDEX_NO_UNPACK) {
+        if (argc > MAX_ARGS_NO_UNPACK) {
                 
                 if (strcmp(argv[UNPACK_INDEX_IF_USED], "-unpack"))
                         goto argerr;

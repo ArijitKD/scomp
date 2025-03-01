@@ -53,7 +53,7 @@ struct compressed_data *compress(char *data)
                 ++j; 
         }
         
-        char *tempdata   = realloc(cd->data, j + 1 * sizeof(char));
+        char *tempdata   = realloc(cd->data, nullpad(j) * sizeof(char));
         size_t *tempdseq = realloc(cd->decode_seq, j * sizeof(size_t));
         
         if (tempdata)

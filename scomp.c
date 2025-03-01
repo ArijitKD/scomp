@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define NULLPAD(datlen)        datlen+1
+#define nullpad(datlen)        (datlen + 1)
 #define MIN_ARGS_FOR_UNPACK    5
 #define FIRST_DSEQ_ELEM_INDEX  4
 #define UNPACK_STRING_INDEX    2
@@ -10,6 +10,8 @@
 #define UNPACK_INDEX_IF_USED   1
 #define MAX_INDEX_NO_UNPACK    2
 #define NO_UNPACK_STR_INDEX    1
+
+typedef unsigned char bool;
 
 struct compressed_data {
         char* data;
@@ -26,7 +28,7 @@ struct compressed_data* compress(char* data)
                 return NULL;
         
         size_t datlen  = strlen(data);
-        cd->data       = calloc(NULLPAD(datlen), sizeof(char));
+        cd->data       = calloc(nullpad(datlen), sizeof(char));
         cd->decode_seq = malloc(datlen * sizeof(size_t));
         
         if (!cd->decode_seq || !cd->data) {
@@ -43,15 +45,12 @@ struct compressed_data* compress(char* data)
                 for (char ch = data[i]; ch == data[i]; ++i)
                         ++count;
                         
-                cd->data[j]       = data[i-1];
+                cd->data[j]       = data[i - 1];
                 cd->decode_seq[j] = count;
                 ++j; 
         }
         
-        // Now try to free some memory
-        ++j;
-        char* tempdata   = realloc(cd->data, j * sizeof(char));
-        --j;
+        char* tempdata   = realloc(cd->data, j + 1 * sizeof(char));
         size_t* tempdseq = realloc(cd->decode_seq, j * sizeof(size_t));
         
         if (tempdata)
@@ -74,7 +73,7 @@ char* decompress(struct compressed_data* cd)
         for (size_t i = 0; i < compresslen; ++i)
                 datlen += cd->decode_seq[i];
 
-        char* unpacked_data = calloc(NULLPAD(datlen), sizeof(char));
+        char* unpacked_data = calloc(nullpad(datlen), sizeof(char));
         
         if (!unpacked_data)
                 return NULL;
@@ -84,12 +83,12 @@ char* decompress(struct compressed_data* cd)
                 j = 0;
                 while (j < cd->decode_seq[k]) {
                         unpacked_data[i] = cd->data[k];
-                        ++i; ++j;
+                        ++i;
+                        ++j;
                 }
                 if (j == 0)
-                        ++i; // Increment i if the inner loop didn't execute
-
-                ++k; // Move on the next element in cd->data & cd->decode_seq
+                        ++i;
+                ++k;
         }
 
         return unpacked_data;        
@@ -97,64 +96,58 @@ char* decompress(struct compressed_data* cd)
 
 int main(int argc, char* argv[])
 {
-        size_t unpack = 0;
+        bool unpack           = 0;
+        bool memalloc_failure = 0;
         
         if (argc == 1 || !strcmp(argv[1], "-help"))
                 goto help;
 
         if (argc > MAX_INDEX_NO_UNPACK) {
-                if (strcmp(argv[UNPACK_INDEX_IF_USED], "-unpack")) {
-                        printf ("scomp: Illegal arguments or unbounded string. Abort.\n");
-                        return 1;
-                }
-                else {
+                
+                if (strcmp(argv[UNPACK_INDEX_IF_USED], "-unpack"))
+                        goto argerr;
+                else
                         unpack = 1;
-                }
         }
+        
+        struct compressed_data *cd = NULL;
         
         if (!unpack) {
                 char* data = argv[NO_UNPACK_STR_INDEX];
                         
-                struct compressed_data* cd = compress(data);
+                cd = compress(data);
 
                 if (!cd) {
                         goto memerr;
-                }
-                else {
+
+                } else {
+                        
                         if (!cd->decode_seq || !cd->data) {
-                                free(cd->decode_seq);
-                                free(cd->data);
-                                free(cd);
-                                goto memerr;
+                                memalloc_failure = 1;
+                                goto cleanup_stage1;
                         }
                         else {
                                 size_t len = strlen(cd->data);
+                                
                                 printf ("Compressed string: \"%s\"\n", cd->data);
                                 printf ("Decode sequence: {");
+                                
                                 for (size_t i = 0; i < len-1; ++i)
                                         printf ("%zu, ", cd->decode_seq[i]);
+                                        
                                 printf ("%zu}\n", cd->decode_seq[len-1]);
-                                
-                                free(cd->decode_seq);
-                                free(cd->data);
-                                free(cd);
+                                goto cleanup_stage1;
                         }
                 }
-        }
-
-        else {
+        } else {
                 
-                if (argc < MIN_ARGS_FOR_UNPACK) {
-                        printf ("scomp: Too few arguments for unpacking. Abort.\n");
-                        return 1;
-                }
+                if (argc < MIN_ARGS_FOR_UNPACK)
+                        goto unpackerr;
                 
-                if (strcmp(argv[DSEQ_ARG_INDEX], "-dseq")) {
-                        printf ("scomp: error: -dseq unspecified or unbounded string. Abort.\n");
-                        return 1;
-                }
+                if (strcmp(argv[DSEQ_ARG_INDEX], "-dseq"))
+                        goto dseqerr;
 
-                struct compressed_data* cd = malloc(sizeof(*cd));
+                cd = malloc(sizeof(*cd));
                 if (!cd)
                         goto memerr;
                 
@@ -164,8 +157,8 @@ int main(int argc, char* argv[])
                 cd->decode_seq = malloc(no_of_unique_char*sizeof(size_t));
                 
                 if (!cd->decode_seq) {
-                        free(cd);
-                        goto memerr;
+                        memalloc_failure = 1;
+                        goto cleanup_stage3;
                 }
                 
                 for (size_t i = 0; i < no_of_unique_char &&
@@ -187,20 +180,44 @@ int main(int argc, char* argv[])
            
                 printf ("Decompressed string: \"%s\"\n", unpacked_data);
                 
-                free(cd->decode_seq);
-                free(cd);
+                goto cleanup_stage2;
         }
         
         return 0;
-                        
-        memerr:
-               printf ("scomp: error: buffer allocation failed due to low memory.\n");
-               return 1;
+
+cleanup_stage1:
+        free(cd->data);
+
+cleanup_stage2:
+        free(cd->decode_seq);
+
+cleanup_stage3:
+        free(cd);
+        if (memalloc_failure)
+                goto memerr;
+        return 0;
+
+help:
+        printf ("Usage: scomp  [-unpack] \"<string>\" [-dseq <1st> ... <nth>]\n\n");
+        printf ("Compress a given string and display it with the decode sequence.\n");
+        printf ("If -unpack is specified -dseq must also be, followed by the decode");
+        printf (" sequence.\n\nCopyright (c) Arijit Kumar Das under MIT License.\n\n");
+        return 0;
+
+memerr:
+        printf ("scomp: error: buffer allocation failed due to low memory.\n");
+        return 1;
         
-        help:
-             printf ("Usage: scomp  [-unpack] \"<string>\" [-dseq <1st> ... <nth>]\n\n");
-             printf ("Compress a given string and display it with the decode sequence.\n");
-             printf ("If -unpack is specified -dseq must also be, followed by the decode");
-             printf (" sequence.\n\nCopyright (c) Arijit Kumar Das under MIT License.\n\n");
-             return 0;
+argerr:
+        printf ("scomp: Illegal arguments or unbounded string. Abort.\n");
+        return 1;
+
+dseqerr:
+        printf ("scomp: error: -dseq unspecified or unbounded string. Abort.\n");
+        return 1;
+
+unpackerr:
+        printf ("scomp: Too few arguments for unpacking. Abort.\n");
+        return 1;
+
 }
